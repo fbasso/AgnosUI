@@ -1,11 +1,13 @@
+import type {ReadableSignal} from '@amadeus-it-group/tansu';
 import {computed, writable} from '@amadeus-it-group/tansu';
+import type {ConfigValidator, Directive, PropsConfig, SlotContent, Widget} from '../../types';
 import {INVALID_VALUE} from '../../types';
-import {bindableProp, stateStores, writablesForProps} from '../../utils/stores';
+import {createAttributesDirective} from '../../utils/directive';
 import {clamp, isNumber} from '../../utils/internal/checks';
-import {typeBoolean, typeFunction, typeNumber, typeString} from '../../utils/writables';
-import type {ConfigValidator, PropsConfig, SlotContent, Widget} from '../../types';
-import type {WidgetsCommonPropsAndState} from '../commonProps';
 import {noop} from '../../utils/internal/func';
+import {bindableProp, stateStores, writablesForProps} from '../../utils/stores';
+import {typeBoolean, typeFunction, typeNumber, typeString} from '../../utils/writables';
+import type {WidgetsCommonPropsAndState} from '../commonProps';
 
 export interface StarContext {
 	/**
@@ -98,6 +100,19 @@ export interface RatingProps extends RatingCommonPropsAndState {
 	onLeave: (rating: number) => void;
 }
 
+export interface RatingDirectives {
+	/**
+	 * A directive to be applied to the main container
+	 * This will handle the keydown, mouseleave, tabindex and aria attributes
+	 */
+	containerDirective: Directive;
+
+	/**
+	 * A directive to be applied on each star element
+	 */
+	starDirective: Directive<{index: number}>;
+}
+
 export interface RatingState extends RatingCommonPropsAndState {
 	/**
 	 * the aria value of the rating
@@ -149,7 +164,7 @@ export interface RatingActions {
 	handleKey(event: KeyboardEvent): void;
 }
 
-export type RatingWidget = Widget<RatingProps, RatingState, object, RatingActions>;
+export type RatingWidget = Widget<RatingProps, RatingState, object, RatingActions, RatingDirectives>;
 
 const defaultConfig: RatingProps = {
 	rating: 0,
@@ -208,9 +223,13 @@ export function createRating(config?: PropsConfig<RatingProps>): RatingWidget {
 			// clean inputs with value validation:
 			ariaValueTextFn$,
 
+			ariaLabel$,
+			ariaLabelledBy$,
+
 			onHover$,
 			onLeave$,
 			onRatingChange$,
+			className$,
 
 			...stateProps
 		},
@@ -241,9 +260,12 @@ export function createRating(config?: PropsConfig<RatingProps>): RatingWidget {
 		}));
 	});
 
-	return {
+	const widget: RatingWidget = {
 		...stateStores({
 			ariaValueText$,
+			ariaLabel$,
+			ariaLabelledBy$,
+			className$,
 			interactive$,
 			rating$,
 			stars$,
@@ -298,7 +320,47 @@ export function createRating(config?: PropsConfig<RatingProps>): RatingWidget {
 				}
 			},
 		},
-		directives: {},
+		directives: {
+			containerDirective: createAttributesDirective(() => ({
+				events: {
+					keydown: (e) => widget.actions.handleKey(e),
+					mouseleave: () => widget.actions.leave(),
+				},
+				attributes: {
+					role: 'slider',
+					class: className$,
+					'aria-valuemin': 0,
+					tabindex: tabindex$,
+					'aria-valuemax': maxRating$,
+					'aria-valuenow': visibleRating$,
+					'aria-valuetext': ariaValueText$,
+					'aria-readonly': computed(() => (readonly$() ? 'true' : undefined)),
+					'aria-disabled': computed(() => (disabled$() ? 'true' : undefined)),
+					'aria-label': ariaLabel$,
+					'aria-labelledby': computed(() => ariaLabelledBy$() || undefined),
+				},
+				classNames: {
+					'au-rating': writable(true),
+				},
+			})),
+			starDirective: createAttributesDirective((starContext$: ReadableSignal<{index: number}>) => {
+				const index = starContext$().index;
+				return {
+					events: {
+						mouseenter: () => widget.actions.hover(index + 1),
+						click: () => widget.actions.click(index + 1),
+					},
+					styles: {
+						cursor: computed(() => (interactive$() ? 'pointer' : 'default')),
+					},
+					classNames: {
+						'au-rating-star': writable(true),
+					},
+				};
+			}),
+		},
 		api: {},
 	};
+
+	return widget;
 }

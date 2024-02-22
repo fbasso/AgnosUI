@@ -2,9 +2,10 @@ import type {UnsubscribeFunction, WritableSignal} from '@amadeus-it-group/tansu'
 import {computed, writable} from '@amadeus-it-group/tansu';
 import type {MockInstance} from 'vitest';
 import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
-import type {RatingWidget, RatingProps} from './rating';
-import {createRating, getRatingDefaultConfig} from './rating';
 import type {WidgetState} from '../../types';
+import {directiveAttributes} from '../../utils/directive';
+import type {RatingProps, RatingWidget} from './rating';
+import {createRating, getRatingDefaultConfig} from './rating';
 
 function keyboardEvent(key: string): KeyboardEvent {
 	return {
@@ -623,6 +624,25 @@ describe(`Rating`, () => {
 			expect(state).toMatchObject({rating: 4});
 			defConfig.set({rating: 2}); // so changing the config continues to work
 			expect(state).toMatchObject({rating: 2});
+		});
+
+		test('containerDirective', () => {
+			const ssrAttributes = directiveAttributes(rating.directives.containerDirective);
+			expect(ssrAttributes).toStrictEqual({
+				'aria-valuemin': '0',
+				role: 'slider',
+				class: 'au-rating',
+				tabindex: '0',
+				'aria-valuemax': '10',
+				'aria-valuenow': '0',
+				'aria-valuetext': '0 out of 10',
+				'aria-label': 'Rating',
+			});
+		});
+
+		test('starDirective', () => {
+			const ssrAttributes = directiveAttributes(rating.directives.starDirective, {index: 1});
+			expect(ssrAttributes).toStrictEqual({style: 'cursor=pointer'});
 		});
 	});
 
